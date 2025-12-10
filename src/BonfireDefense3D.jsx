@@ -3,6 +3,32 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, Text } from '@react-three/drei'
 import * as THREE from 'three'
 
+// 반응형 훅
+const useResponsive = () => {
+  const [dimensions, setDimensions] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    height: typeof window !== 'undefined' ? window.innerHeight : 1080
+  })
+
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      })
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const isMobile = dimensions.width < 768
+  const isTablet = dimensions.width >= 768 && dimensions.width < 1024
+  const scale = isMobile ? dimensions.width / 375 : isTablet ? 1.2 : 1.5
+
+  return { isMobile, isTablet, scale, width: dimensions.width, height: dimensions.height }
+}
+
 // 플레이어 컴포넌트
 function Player({ position, attackRange }) {
   const meshRef = useRef()
@@ -166,7 +192,7 @@ function Ground() {
 }
 
 // 게임 월드 컴포넌트
-function GameWorld({ gameRef, forceUpdate }) {
+function GameWorld({ gameRef, forceUpdate, isMobile }) {
   useFrame(() => {
     const g = gameRef.current
     if (g.gameStarted && !g.gameOver && g.waveDelay === 0) {
@@ -237,7 +263,7 @@ function GameWorld({ gameRef, forceUpdate }) {
       {g.waveDelay > 0 && (
         <Text
           position={[0, 5, 0]}
-          fontSize={2}
+          fontSize={isMobile ? 1.5 : 2}
           color="white"
           anchorX="center"
           anchorY="middle"
@@ -250,10 +276,14 @@ function GameWorld({ gameRef, forceUpdate }) {
 }
 
 // 컨트롤러 컴포넌트
-function MovementController({ position, onMove, onEnd, disabled }) {
+function MovementController({ position, onMove, onEnd, disabled, isMobile }) {
   const [isActive, setIsActive] = useState(false)
   const [startPos, setStartPos] = useState({ x: 0, y: 0 })
   const controllerRef = useRef(null)
+  
+  const size = isMobile ? 120 : 150
+  const centerSize = isMobile ? 50 : 60
+  const halfSize = size / 2
   
   const handleStart = (clientX, clientY) => {
     if (disabled) return
@@ -298,13 +328,13 @@ function MovementController({ position, onMove, onEnd, disabled }) {
       ref={controllerRef}
       style={{
         position: 'absolute',
-        left: `${position.x - 75}px`,
-        top: `${position.y - 75}px`,
-        width: '150px',
-        height: '150px',
+        left: `${position.x - halfSize}px`,
+        top: `${position.y - halfSize}px`,
+        width: `${size}px`,
+        height: `${size}px`,
         borderRadius: '50%',
         background: 'rgba(96, 165, 250, 0.2)',
-        border: '2px solid rgba(96, 165, 250, 0.5)',
+        border: `${isMobile ? '2px' : '2px'} solid rgba(96, 165, 250, 0.5)`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -331,8 +361,8 @@ function MovementController({ position, onMove, onEnd, disabled }) {
     >
       <div
         style={{
-          width: '60px',
-          height: '60px',
+          width: `${centerSize}px`,
+          height: `${centerSize}px`,
           borderRadius: '50%',
           background: isActive ? 'rgba(96, 165, 250, 0.8)' : 'rgba(96, 165, 250, 0.5)',
           transition: isActive ? 'none' : 'all 0.2s',
@@ -352,6 +382,7 @@ const WEAPON_TYPES = {
 }
 
 export default function BonfireDefense3D() {
+  const { isMobile, isTablet, scale, width, height } = useResponsive()
   const gameRef = useRef({
     player: { x: 0, z: 0, speed: 0.15, attackRange: 8 },
     bonfire: { x: 0, z: 0, hp: 10, maxHp: 10 },
@@ -459,13 +490,13 @@ export default function BonfireDefense3D() {
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     
     // HUD 영역이나 다른 UI 요소와 겹치지 않는지 확인
-    const hudTop = 20
-    const hudHeight = 120 // 무기 슬롯 포함
+    const hudTop = isMobile ? 10 : 20
+    const hudHeight = isMobile ? 140 : 120 // 무기 슬롯 포함
     
     if (clientY > hudTop + hudHeight) {
       setControllerPosition({ x: clientX, y: clientY })
     }
-  }, [gameStarted, gameOver])
+  }, [gameStarted, gameOver, isMobile])
   
   // 무기 아이템 드롭
   const dropWeaponItem = useCallback((g, x, z) => {
@@ -738,55 +769,79 @@ export default function BonfireDefense3D() {
     return () => cancelAnimationFrame(animationId)
   }, [spawnZombie, triggerUpdate, dropWeaponItem, collectWeapon])
   
+  // 반응형 스타일 계산
+  const hudTop = isMobile ? 10 : 20
+  const hudGap = isMobile ? 8 : 12
+  const fontSize = isMobile ? 14 : 18
+  const fontSizeSmall = isMobile ? 11 : 14
+  const fontSizeTiny = isMobile ? 9 : 12
+  const buttonPadding = isMobile ? '6px 12px' : '8px 16px'
+  const buttonFontSize = isMobile ? 12 : 14
+  const weaponPadding = isMobile ? '6px 8px' : '8px 12px'
+  const weaponGap = isMobile ? 6 : 8
+
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative', background: '#111827' }}>
+    <div style={{ width: '100vw', height: '100vh', position: 'relative', background: '#111827', overflow: 'hidden' }}>
       {/* HUD */}
       <div style={{
         position: 'absolute',
-        top: '20px',
+        top: `${hudTop}px`,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '12px',
+        gap: `${hudGap}px`,
         zIndex: 10,
-        fontFamily: 'sans-serif'
+        fontFamily: 'sans-serif',
+        width: '100%',
+        maxWidth: '100vw',
+        padding: isMobile ? '0 8px' : '0 20px'
       }}>
         <div style={{
           display: 'flex',
-          gap: '32px',
+          flexWrap: 'wrap',
+          gap: isMobile ? '8px' : '16px',
           color: 'white',
-          fontSize: '18px',
-          alignItems: 'center'
+          fontSize: `${fontSize}px`,
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%'
         }}>
-          <span>점수: <strong style={{ color: '#facc15' }}>{score}</strong></span>
-          <span>웨이브: <strong style={{ color: '#60a5fa' }}>{wave}</strong>/5</span>
-          <span>모닥불: <strong style={{ color: bonfireHp > 3 ? '#4ade80' : '#ef4444' }}>
-            {'❤️'.repeat(Math.max(0, bonfireHp))}
-          </strong></span>
+          <span style={{ fontSize: `${fontSize}px` }}>
+            점수: <strong style={{ color: '#facc15' }}>{score}</strong>
+          </span>
+          <span style={{ fontSize: `${fontSize}px` }}>
+            웨이브: <strong style={{ color: '#60a5fa' }}>{wave}</strong>/5
+          </span>
+          <span style={{ fontSize: `${fontSize}px` }}>
+            모닥불: <strong style={{ color: bonfireHp > 3 ? '#4ade80' : '#ef4444' }}>
+              {'❤️'.repeat(Math.max(0, bonfireHp))}
+            </strong>
+          </span>
           
           {/* 자동 전투 모드 버튼 */}
           {gameStarted && !gameOver && (
             <button
               onClick={toggleAutoCombat}
               style={{
-                padding: '8px 16px',
+                padding: buttonPadding,
                 background: autoCombat ? '#22c55e' : 'rgba(0, 0, 0, 0.6)',
                 border: `2px solid ${autoCombat ? '#22c55e' : '#6b7280'}`,
                 borderRadius: '8px',
                 color: 'white',
-                fontSize: '14px',
+                fontSize: `${buttonFontSize}px`,
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s'
+                gap: '4px',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap'
               }}
             >
               <span>{autoCombat ? '⚔️' : '🤖'}</span>
-              <span>{autoCombat ? '자동 전투 ON' : '자동 전투 OFF'}</span>
+              <span>{autoCombat ? (isMobile ? 'ON' : '자동 전투 ON') : (isMobile ? 'OFF' : '자동 전투 OFF')}</span>
             </button>
           )}
         </div>
@@ -795,10 +850,18 @@ export default function BonfireDefense3D() {
         {gameStarted && !gameOver && gameRef.current.weapons.length > 0 && (
           <div style={{
             display: 'flex',
-            gap: '12px',
-            alignItems: 'center'
+            flexWrap: 'wrap',
+            gap: `${weaponGap}px`,
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            maxWidth: '100vw',
+            overflowX: 'auto',
+            padding: isMobile ? '0 4px' : '0'
           }}>
-            <span style={{ color: '#9ca3af', fontSize: '14px', marginRight: '8px' }}>무기:</span>
+            <span style={{ color: '#9ca3af', fontSize: `${fontSizeSmall}px`, marginRight: isMobile ? '4px' : '8px' }}>
+              무기:
+            </span>
             {gameRef.current.weapons.map((weapon, idx) => {
               const weaponData = WEAPON_TYPES[weapon.type]
               return (
@@ -808,21 +871,22 @@ export default function BonfireDefense3D() {
                     background: 'rgba(0, 0, 0, 0.6)',
                     border: `2px solid ${weaponData.color}`,
                     borderRadius: '8px',
-                    padding: '8px 12px',
+                    padding: weaponPadding,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: `${weaponGap}px`,
                     color: 'white',
-                    fontSize: '14px'
+                    fontSize: `${fontSizeSmall}px`,
+                    whiteSpace: 'nowrap'
                   }}
                 >
                   <span style={{ color: weaponData.color, fontWeight: 'bold' }}>
                     {weaponData.name}
                   </span>
-                  <span style={{ color: '#9ca3af', fontSize: '12px' }}>
+                  <span style={{ color: '#9ca3af', fontSize: `${fontSizeTiny}px` }}>
                     Lv.{weapon.level}
                   </span>
-                  <span style={{ color: '#facc15', fontSize: '12px' }}>
+                  <span style={{ color: '#facc15', fontSize: `${fontSizeTiny}px` }}>
                     ⚔️ {weaponData.damage * weapon.level}
                   </span>
                 </div>
@@ -846,7 +910,7 @@ export default function BonfireDefense3D() {
             enableRotate={false}
             target={[0, 0, 0]}
           />
-          <GameWorld gameRef={gameRef} forceUpdate={triggerUpdate} />
+          <GameWorld gameRef={gameRef} forceUpdate={triggerUpdate} isMobile={isMobile} />
         </Canvas>
       </div>
       
@@ -863,24 +927,59 @@ export default function BonfireDefense3D() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 20
+          zIndex: 20,
+          padding: isMobile ? '20px' : '40px'
         }}>
-          <h1 style={{ color: '#f97316', fontSize: '32px', marginBottom: '16px', fontWeight: 'bold' }}>
+          <h1 style={{ 
+            color: '#f97316', 
+            fontSize: isMobile ? '24px' : '32px', 
+            marginBottom: isMobile ? '12px' : '16px', 
+            fontWeight: 'bold',
+            textAlign: 'center'
+          }}>
             🔥 모닥불 디펜스 3D
           </h1>
-          <p style={{ color: '#9ca3af', marginBottom: '8px' }}>화면을 탭하여 이동 컨트롤러 생성</p>
-          <p style={{ color: '#9ca3af', marginBottom: '8px' }}>자동으로 가까운 좀비 공격</p>
-          <p style={{ color: '#9ca3af', marginBottom: '8px' }}>무기 아이템을 획득하여 공격력 강화!</p>
-          <p style={{ color: '#9ca3af', marginBottom: '24px' }}>상단 자동 전투 모드로 자동 사냥 가능</p>
+          <p style={{ 
+            color: '#9ca3af', 
+            marginBottom: isMobile ? '6px' : '8px',
+            fontSize: isMobile ? '12px' : '16px',
+            textAlign: 'center'
+          }}>
+            화면을 탭하여 이동 컨트롤러 생성
+          </p>
+          <p style={{ 
+            color: '#9ca3af', 
+            marginBottom: isMobile ? '6px' : '8px',
+            fontSize: isMobile ? '12px' : '16px',
+            textAlign: 'center'
+          }}>
+            자동으로 가까운 좀비 공격
+          </p>
+          <p style={{ 
+            color: '#9ca3af', 
+            marginBottom: isMobile ? '6px' : '8px',
+            fontSize: isMobile ? '12px' : '16px',
+            textAlign: 'center'
+          }}>
+            무기 아이템을 획득하여 공격력 강화!
+          </p>
+          <p style={{ 
+            color: '#9ca3af', 
+            marginBottom: isMobile ? '16px' : '24px',
+            fontSize: isMobile ? '12px' : '16px',
+            textAlign: 'center'
+          }}>
+            상단 자동 전투 모드로 자동 사냥 가능
+          </p>
           <button
             onClick={startGame}
             style={{
-              padding: '16px 32px',
+              padding: isMobile ? '12px 24px' : '16px 32px',
               background: '#f97316',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
-              fontSize: '20px',
+              fontSize: isMobile ? '16px' : '20px',
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
@@ -903,23 +1002,35 @@ export default function BonfireDefense3D() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 20
+          zIndex: 20,
+          padding: isMobile ? '20px' : '40px'
         }}>
-          <h2 style={{ color: 'white', fontSize: '28px', marginBottom: '8px', fontWeight: 'bold' }}>
+          <h2 style={{ 
+            color: 'white', 
+            fontSize: isMobile ? '22px' : '28px', 
+            marginBottom: isMobile ? '8px' : '8px', 
+            fontWeight: 'bold',
+            textAlign: 'center'
+          }}>
             {wave > 5 ? '🎉 승리!' : '💀 게임 오버'}
           </h2>
-          <p style={{ color: '#facc15', fontSize: '24px', marginBottom: '24px' }}>
+          <p style={{ 
+            color: '#facc15', 
+            fontSize: isMobile ? '18px' : '24px', 
+            marginBottom: isMobile ? '16px' : '24px',
+            textAlign: 'center'
+          }}>
             최종 점수: {score}
           </p>
           <button
             onClick={startGame}
             style={{
-              padding: '16px 32px',
+              padding: isMobile ? '12px 24px' : '16px 32px',
               background: '#f97316',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
-              fontSize: '20px',
+              fontSize: isMobile ? '16px' : '20px',
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
@@ -936,21 +1047,26 @@ export default function BonfireDefense3D() {
           onMove={handleMove}
           onEnd={handleControllerEnd}
           disabled={!gameStarted || gameOver}
+          isMobile={isMobile}
         />
       )}
       
       {/* 게임 정보 */}
       <div style={{
         position: 'absolute',
-        bottom: '20px',
-        right: '20px',
+        bottom: isMobile ? '10px' : '20px',
+        right: isMobile ? '10px' : '20px',
         color: '#6b7280',
-        fontSize: '14px',
+        fontSize: isMobile ? '10px' : '14px',
         textAlign: 'right',
         zIndex: 10
       }}>
-        <p>🔵 플레이어 | 🟢 좀비 | 🟠 모닥불</p>
-        <p>모닥불을 5웨이브 동안 지켜라!</p>
+        <p style={{ fontSize: isMobile ? '10px' : '14px' }}>
+          🔵 플레이어 | 🟢 좀비 | 🟠 모닥불
+        </p>
+        <p style={{ fontSize: isMobile ? '10px' : '14px' }}>
+          모닥불을 5웨이브 동안 지켜라!
+        </p>
       </div>
     </div>
   )
